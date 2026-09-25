@@ -26,7 +26,7 @@ class UdpConnection:
             print(f"Errore di invio UDP verso la porta: {port}: {e}")
 
 
-    # Dichiaro il meto per riceve i pacchetti dal canale di comunicazione
+    # Dichiaro il metodo per riceve i pacchetti dal canale di comunicazione
     def receive(self):
         try:
             # Salvo il contenuto del messaggio (max 4096 bytes) nella variabile data e le coordinate del mittente nela tupla addr ('IP', porta)
