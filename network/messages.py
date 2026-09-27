@@ -11,7 +11,6 @@ class MessageType(Enum):
     ANSWER = "ANSWER"
     COORDINATOR = "COORDINATOR"
     ELECTION = "ELECTION"
-    PING = "PING"
 
 
 
