@@ -6,7 +6,7 @@ from enum import Enum
 class NodeState(Enum):
     # Tipi di messaggi defini come stringhe costanti
     NORMAL = "NORMAL"
-    ANSWER = "ANSWER"
-    COORDINATOR = "COORDINATOR"
-    ELECTION = "ELECTION"
+    IN_ELECTION = "IN_ELECTION"
+    WAITING_COORD = "WAITING_COORD"
+    LEADER = "LEADER"
 
