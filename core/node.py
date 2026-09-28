@@ -8,9 +8,9 @@ from utils.config import HOST, NODE_ADDRESSES, TIMEOUT_T, TIMEOUT_T_PRIME
 
 
 class Node:
-    # Costruttore della classe Node
+    # Inizializzazione dello stato del nodo e dell'interfaccia di rete
+    # Il nodo parte sempre nello stato NORMAL
     def __init__(self, node_id: int):
-        # Inizializzo tutti gli attributi del nodo
         self.node_id = node_id
         self.logger = setup_logger(self.node_id)
 
@@ -20,36 +20,36 @@ class Node:
         self.state = NodeState.NORMAL
         self.coordinator_id = None
 
-        # Timer per le elezioni T e T'
+        # Timer per l'algoritmo del bullo: T per l'attesa di ANSWER e T' per l'attesa di COORDINATOR
         self.election_timer_start = None
         self.coord_timer_start = None
 
-        # Variabili di supporto per misurare il passaggio del timeout T
+        # Variabili di supporto per il rilevamento dei guasti del coordinatore
         self.last_coordinator_msg = time.time()
         self.last_heartbeat_sent = 0.0
 
 
 
-    # Definisco la funzione responsabile del loop di esecutivo del nodo
+    # Loop di esecuzione del nodo
     def run(self):
         self.logger.info("Avvio nodo")
         try:
             while True:
-                # Verifica se i timer dell'algoritmo del bullo e del meccanismo di accertamento dello stato del coordinatore sono attivi
+                # Verifica se i timer dell'algoritmo del bullo e del meccanismo di rilevamento dei guasti del coordinatore sono scaduti
                 self._check_timeouts()
 
                 try:
-                    # Leggo i dati dal canale di comunicazione
+                    # Lettura dei dati dal canale di comunicazione
                     packet = self.connection.receive()
 
-                    # Se il pacchetto non è vuoto decifriamo il messaggio
+                    # Se il pacchetto non è vuoto decifra il messaggio
                     if packet:
                         data, ip, port = packet
 
-                        # Converto il messaggio dalla rappresentazione esterna dei dati a quella interna
+                        # UNRMARSHALLING: Converte il messaggio dalla rappresentazione esterna dei dati a quella interna
                         msg = Message.from_xml(data.decode('utf-8'))
 
-                        # Elaboro il messaggio e reagisco in base al tipo di messaggio ricevuto
+                        # Elabora il messaggio e reagisce in base al tipo di messaggio ricevuto
                         self._process_message(msg)
 
                     # Rallento leggermente per non saturare la CPU
@@ -121,17 +121,27 @@ class Node:
     def _process_message(self, msg: Message):
         msg_type = msg.message_type
 
+        # Verifico se il messaggio ricevuto è un messaggio di battito di routine del leader attuale
+        is_heartbeat = (msg_type == MessageType.COORDINATOR and self.coordinator_id == msg.sender_id and self.state == NodeState.NORMAL)
+
+        # Stampa la ricezione del messaggio se il messaggio non è di battito
+        if not is_heartbeat:
+            self.logger.info(f"Ricevuto {msg_type.name} da P{msg.sender_id}")
+
+
         # Definisco il comportamento che dovrà avere il nodo in base al tipo del messggio che ha ricevuto
         match msg_type:
             case MessageType.ELECTION:
                 # Rispondo sempre con answer: Istanzio il nuovo messaggio ANSWER e lo invio al nodo da cui ho ricevuto il messaggio ELECTION
                 answer_msg = Message(MessageType.ANSWER, self.node_id)
                 self.connection.send(answer_msg.to_xml().encode('utf-8'), HOST, NODE_ADDRESSES[msg.sender_id])
+                self.logger.info(f"Inviato ANSWER a P{msg.sender_id}")
 
                 # Se il nodo è già coordinatore rispondo anche con un messaggio COORDINATOR
                 if self.state == NodeState.LEADER:
                     coord_msg = Message(MessageType.COORDINATOR, self.node_id)
                     self.connection.send(coord_msg.to_xml().encode('utf-8'), HOST, NODE_ADDRESSES[msg.sender_id])
+                    self.logger.info(f"Inviato COORDINATOR: a P{msg.sender_id}")
 
                 # Se non sono LEADER e non sono in elezione ne avvio una
                 elif self.state != NodeState.IN_ELECTION:
