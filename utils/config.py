@@ -1,9 +1,9 @@
-# In questa classe definisco le costanti globali del sistema
+# In questo file definisco le costanti globali del sistema
 
-# Definisco l'IP della comunicazione impostando l'indirizzo IP locale (localhost)
+# Definisce l'IP della comunicazione impostando l'indirizzo IP locale (localhost)
 HOST = "127.0.0.1"
 
-# Definisco il dizionario che conterrà l'associazione di ciascun nodo con il relativo numero di porta
+# Dizionario che conterrà l'associazione di ciascun nodo con il relativo numero di porta
 NODE_ADDRESSES = {
     1: 5001,
     2: 5002,
@@ -12,8 +12,8 @@ NODE_ADDRESSES = {
     5: 5005,
 }
 
-# Definisco il tempo massimo (in secondi) di attesa per ricevere un messaggio ANSWER dopo aver inviato un ELECTION
+# Definisco il tempo massimo (in secondi) di attesa per ricevere un messaggio ANSWER dopo l'avvio di un'elezione
 TIMEOUT_T = 6.0
 
-# Definisco il tempo massimo di attesa per ricevere un messaggio COORDINATOR dopo avere ricevuto un ANSWER
+# Definisce il tempo massimo di attesa per ricevere un messaggio COORDINATOR dopo avere ricevuto un ANSWER da un nodo superiore
 TIMEOUT_T_PRIME = 9.0
