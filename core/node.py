@@ -65,14 +65,15 @@ class Node:
 
 
 
-    # Definisco il metodo responsabile di avviare un elezione
+    # Inizia l'elezione dell'algoritmo del bullo, interroga solamente i nodi con id superiore p
     def start_election(self):
         self.state = NodeState.IN_ELECTION
         self.logger.info("Avvio elezione")
 
+        # Rallentamento dell'esecuzione per aumentare la leggibilità dei log sul terminale
         time.sleep(1.5)
 
-        # Prendo tutti gli identificatori dei nodi con id maggiore del nodo attuale
+        # Estrae tutti i nodi con id maggiore all'id del nodo attuale
         higher_nodes = [nid for nid in NODE_ADDRESSES.keys() if nid > self.node_id]
 
         # Se non ci sono nodi con ID superiore il nodo si dichiara coordinatore
@@ -80,13 +81,14 @@ class Node:
             self.logger.info("Nessun nodo con ID superiore")
             self._declare_coordinator()
         else:
-            # Invia un messaggio di election a tutti i nodi con ID superiore
+            # Altrimenti inizializza il messaggio, ne esegue il marshalling e lo invia a tutti i nodi con ID superiore
             msg = Message(MessageType.ELECTION, self.node_id)
             payload = msg.to_xml().encode('utf-8')
             for nid in higher_nodes:
                 # Invia il messaggio e lo riporta sul logger
                 self.connection.send(payload, HOST, NODE_ADDRESSES[nid])
                 self.logger.info(f"Inviato ELECTION: a P{nid}")
+
                 time.sleep(1.5)
 
                 # Innesca il Timeout T di attesa del messaggio ANSWER
@@ -94,21 +96,21 @@ class Node:
 
 
 
-    # Definisco il metodo per dichiararsi coordinatore
+    # Il metodo che esegue si dichiara coordinatore
     def _declare_coordinator(self):
         time.sleep(1.5)
 
-        # Imposto lo stato del nodo come coordinatore
+        # Imposta lo stato del nodo come coordinatore
         self.state = NodeState.LEADER
-        # Assegno a coordinator_id il valore dell'id del nodo stesso che sta eseguendo
+        # Assegna a coordinator_id il valore dell'id del nodo stesso che sta eseguendo
         self.coordinator_id = self.node_id
         self.logger.info("Mi dichiaro COORDINATORE")
 
-        # Azzero il contatore dei timer per l'elezione
+        # Azzera i contatori dei timer per l'elezione
         self.election_timer_start = None
         self.coord_timer_start = None
 
-        # Invio un messaggio COORDINATOR a tutti i nodi con ID inferiore
+        # Invia un messaggio COORDINATOR a tutti i nodi con ID inferiore
         lower_nodes = [nid for nid in NODE_ADDRESSES.keys() if nid < self.node_id]
         msg = Message(MessageType.COORDINATOR, self.node_id)
         payload = msg.to_xml().encode('utf-8')
@@ -117,14 +119,14 @@ class Node:
 
 
 
-    # Definisco il metodo che gestisce il comportamento alla ricezione di un messaggio
+    # Definisce il comportamento del nodo alla ricezione di un messaggio
     def _process_message(self, msg: Message):
         msg_type = msg.message_type
 
-        # Verifico se il messaggio ricevuto è un messaggio di battito di routine del leader attuale
+        # Verifica se il messaggio ricevuto è un messaggio di battito per il meccanismo di rilevazione dei guasti del coordinatore
         is_heartbeat = (msg_type == MessageType.COORDINATOR and self.coordinator_id == msg.sender_id and self.state == NodeState.NORMAL)
 
-        # Stampa la ricezione del messaggio se il messaggio non è di battito
+        # Stampa la ricezione del messaggio se il messaggio non è di battito: Evita di saturare il log con messaggi di ricezione di un messaggio COORDINATOR
         if not is_heartbeat:
             self.logger.info(f"Ricevuto {msg_type.name} da P{msg.sender_id}")
 
@@ -137,19 +139,19 @@ class Node:
                 self.connection.send(answer_msg.to_xml().encode('utf-8'), HOST, NODE_ADDRESSES[msg.sender_id])
                 self.logger.info(f"Inviato ANSWER a P{msg.sender_id}")
 
-                # Se il nodo è già coordinatore rispondo anche con un messaggio COORDINATOR
+                # Se il nodo è già coordinatore risponde anche con un messaggio COORDINATOR per ribadire il suo ruolo
                 if self.state == NodeState.LEADER:
                     coord_msg = Message(MessageType.COORDINATOR, self.node_id)
                     self.connection.send(coord_msg.to_xml().encode('utf-8'), HOST, NODE_ADDRESSES[msg.sender_id])
                     self.logger.info(f"Inviato COORDINATOR: a P{msg.sender_id}")
 
-                # Se non sono LEADER e non sono in elezione ne avvio una
+                # Se il nodo non è LEADER e non è in un'elezione ne avvia una
                 elif self.state != NodeState.IN_ELECTION:
                     self.start_election()
 
 
             case MessageType.ANSWER:
-                # Se durante un'elezione ricevo un messaggio ANSWER cambio stato, termino il timer di attesa di ANSWER e avvio quello del COORDINATOR
+                # Se durante un'elezione ricevo un messaggio ANSWER, cambio stato, termino il timer T di attesa di ANSWER e avvio il timer T' di attesa del COORDINATOR
                 if self.state == NodeState.IN_ELECTION:
                     self.state = NodeState.WAITING_COORD
                     self.election_timer_start = None
@@ -157,7 +159,7 @@ class Node:
 
 
             case MessageType.COORDINATOR:
-                # Se ho ricevuto un messaggio COORDINATOR da un nodo con ID minore del nodo attuale ignoro il messaggio e avvio un elezione
+                # Se riceve un messaggio COORDINATOR da un nodo con ID minore del nodo attuale ingora il messaggio e avvia un elezione
                 # Necessario nel caso in cui un nodo con ID maggiore rientri in funzione dopo un guasto
                 if msg.sender_id < self.node_id:
                     self.logger.warning(f"Rifiuto COORDINATOR da un nodo con ID inferiori (P{msg.sender_id}). Avvio elezione")
@@ -166,59 +168,59 @@ class Node:
 
                 # Se il nodo che ha inviato il messaggio ha un ID con valore superiore all'ID del nodo attuale quest'ultimo si sottomette
                 else :
-                    # Resetto i timer di attesa e faccio tornare lo stato a NORMAL
+                    # Ripristina i timer di attesa e torna allo stato NORMAL
                     self.election_timer_start = None
                     self.coord_timer_start = None
                     self.state = NodeState.NORMAL
 
-                    # Se l'id del mittente del messaggio coordinator è diverso da quello precedentemente salvato aggiorno il valore di coordinator_id
+                    # Se l'id del mittente del messaggio coordinator è diverso da quello precedentemente salvato aggiorna il valore di coordinator_id
                     if self.coordinator_id != msg.sender_id:
                         self.coordinator_id = msg.sender_id
                         self.logger.info(f"Nuovo coordinatore registrato: P{self.coordinator_id}")
 
-                    # Azzera il cronometro che controlla eventiai guasti del coordinatore
+                    # Azzera il timer che monitora eventuali guasti del coordinatore attuale
                     self.last_coordinator_msg = time.time()
 
 
 
-    # Verifica le scadenza dei timeout
+    # Verifica le scadenzae dei timeout dell'elezione o del meccanismo di rilevazione dei guasti del coordinator
     def _check_timeouts(self):
         now = time.time()
 
-        # Verifico la scadenza del timeout T per l'attesa del messaggio di ANSWER
+        # Verifica la scadenza del timeout T per l'attesa del messaggio di ANSWER
         if self.election_timer_start and (now - self.election_timer_start > TIMEOUT_T):
             self.logger.info("Timeout T Scaduto: Nessuna risposa dai nodi superiori")
             self.election_timer_start = None
             self._declare_coordinator()
 
-        # Verifico se è scaduto il timeout relativo all'attesa del messaggio coordinator
+        # Verifica la scadenza del timeout T' relativo all'attesa del messaggio coordinator
         elif self.coord_timer_start and (now - self.coord_timer_start > TIMEOUT_T_PRIME):
             self.logger.info("Timeout T' Scaduto: Il coordinatore non risponde. Riavvio elezione")
             self.coord_timer_start = None
             self.start_election()
 
-        # Meccanismo di controllo dello stato del coordinatore: Serve per verificare se il coordinatore ha subito un guasto ed è fallito
+        # Meccanismo di controllo dello stato del coordinatore: Verifica se il coordinatore ha subito un guasto ed è fallito
         if self.coordinator_id is not None:
 
-            # Se il nodo corrente è il leader annuncia la sua presenza ogni T/2 secondi
+            # Se il nodo corrente è il leader annuncia la sua presenza ogni T/2 secondi (Battito cardiaco)
             if self.node_id == self.coordinator_id:
-                # Imposto un intervallo di attesa tra un invio e l'altro di un messaggio di coordinator ai nodi con id inferiore
+                # Imposta un intervallo di attesa tra un invio e l'altro di un messaggio di coordinator ai nodi con id inferiore
                 # Questo segnala agli altri nodi che il nodo attuale è ancora attivo
                 interval = TIMEOUT_T/2
 
                 # Se l'intervallo di tempo tra l'orario attuale e quello in cui ho mandato l'ultimo "segno di vita" è maggiore
-                # dell'intervallo di tempo stabilito invio un nuovo messaggio coordinator per segnalare il corretto funzionamento del nodo
+                # dell'intervallo di tempo stabilito invia un nuovo messaggio coordinator per segnalare il corretto funzionamento del nodo
                 if now - self.last_heartbeat_sent > interval:
                     msg = Message(MessageType.COORDINATOR, self.node_id)
                     payload = msg.to_xml().encode('utf-8')
 
-                    # Dal dizionario presente nella configuraziona estraggo gli ID di tutti i nodi e la loro porta
+                    # Dal dizionario presente nella configuraziona estrae gli ID di tutti i nodi e la loro porta
                     for target_id, target_addr in NODE_ADDRESSES.items():
-                        # Invio il messaggio COORDINATOR a tutti i nodi tranne che al nodo stesso che sta eseguendo
+                        # Invia il messaggio COORDINATOR a tutti i nodi tranne che a se stesso
                         if target_id != self.node_id:
                             self.connection.send(payload, HOST,target_addr)
 
-                    # Aggiorno la variabile che tiene traccia dell'istante in cui è stato realizzato l'ultimo invio
+                    # Aggiorna la variabile che tiene traccia dell'istante in cui è stato realizzato l'ultimo invio
                     self.last_heartbeat_sent = now
 
             # I nodi sotto il coordinatore considerano il leader fallito dopo il timeout T
