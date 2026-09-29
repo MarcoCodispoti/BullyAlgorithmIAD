@@ -226,6 +226,6 @@ class Node:
             # I nodi sotto il coordinatore considerano il leader fallito dopo il timeout T
             elif self.state == NodeState.NORMAL:
                 if now - self.last_coordinator_msg > TIMEOUT_T:
-                    self.logger.error(f"*** Il COORDINATORE P{self.coordinator_id} E' Caduto! ***")
+                    self.logger.error(f"*** Timeout: Il COORDINATORE P{self.coordinator_id} non risponde ***")
                     self.coordinator_id = None
                     self.start_election()
