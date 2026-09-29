@@ -1,41 +1,42 @@
 
-# Importo la libreria per la gestione di socket e connessione
+# Importa la libreria per la gestione di socket e connessioni
 import socket
 
 
 class UdpConnection:
-    # Definisco il costruttore della classe UdpConnection
+    # Inizializza l'interfaccia di comunicazione di rete
     def __init__(self, host, port):
-        # Creo il socket di rete e lo salvo nella variabile di istanza, specificando l'uso di datagrammi UDP e l'uso di indirizzi IPv4
+        # Crea il socket di rete e lo salva nella variabile di istanza, specificando l'uso di datagrammi UDP e l'uso di indirizzi IPv4
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-        # Faccio il binding del socket appena creato all'indirizzo IP e alla porta specificati da host e port
+        # Esegue il binding del socket appena creato all'indirizzo IP e alla porta specificati da host e port
         self.sock.bind((host, port))
 
-        # Rallento il proesso per non saturare il processore
+        # Imposta un timeout in cui se il socket non legge dati dal canale di comunicazione interrompe l'attesa per non bloccare il processo fino a una ricezione
         self.sock.settimeout(0.1)
 
 
-    # Definisco il metodo per inviare pacchetti sul canale di comunicazione
+    # Definisce il metodo per inviare datagrammi UDP verso uno specifico destinatario sul canale di comunicazione
     def send(self, data: bytes, host: str, port: int):
         try:
-            # Invio il pacchetto contenente le informazioni, la funzione sendto richiede necessariamente una tupla (host, port)
+            # Invia il pacchetto contenente le informazioni al nodo di destinazione richiesto (tupla host, port)
             self.sock.sendto(data, (host, port))
         except Exception as e:
-            # Se si solleva un'eccezione stampo l'errore
+            # Se si solleva un'eccezione stampa l'errore
             print(f"Errore di invio UDP verso la porta: {port}: {e}")
 
 
-    # Dichiaro il metodo per riceve i pacchetti dal canale di comunicazione
+    # Dichiara il metodo per ricevere i pacchetti dal canale di comunicazione
     def receive(self):
         try:
-            # Salvo il contenuto del messaggio (max 4096 bytes) nella variabile data e le coordinate del mittente nela tupla addr ('IP', porta)
+            # Legge dal buffer di rete (massimo 4096 byte).
+            # Restituisce i dati grezzi e una tupla contenente l'indirizzo IP e la porta del mittente
             data, addr = self.sock.recvfrom(4096)
 
-            # Restituisco i dati grezzi, l'IP del mittente (addr[0]) e la porta usata dal mittente (addr[1]) come elementi separati
+            # Restituisce i dati grezzi, l'IP del mittente (addr[0]) e la porta usata dal mittente (addr[1]) come elementi separati
             return data, addr[0], addr[1]
 
-        # Se il socket non trova nessun dato in arrivo o viene sollevata un eccezione non ritorna nulla
+        # Se il socket non trova nessun dato in arrivo e va in timeout o viene sollevata un'eccezione non ritorna nulla
         except (socket.timeout, BlockingIOError):
             return None
         except Exception as e:
@@ -43,7 +44,7 @@ class UdpConnection:
             return None
 
 
-    # Definisco il metodo per chiudere la connessione
+    # Definisce il metodo per chiudere il canale di comunicazione
     def close(self):
-        # Chiudo il socket e rilasciano le risorse di rete (libera la porta utilizzata)
+        # Chiude il socket e rilascia le risorse di rete (libera la porta utilizzata)
         self.sock.close()
