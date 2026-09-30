@@ -21,6 +21,9 @@ class UdpConnection:
         try:
             # Invia il pacchetto contenente le informazioni al nodo di destinazione richiesto (tupla host, port)
             self.sock.sendto(data, (host, port))
+        except ConnectionResetError:
+            # Su windows ignora l'errore generato quando si tenta di inviare a un nodo caduto
+            pass
         except Exception as e:
             # Se si solleva un'eccezione stampa l'errore
             print(f"Errore di invio UDP verso la porta: {port}: {e}")
@@ -37,7 +40,7 @@ class UdpConnection:
             return data, addr[0], addr[1]
 
         # Se il socket non trova nessun dato in arrivo e va in timeout o viene sollevata un'eccezione non ritorna nulla
-        except (socket.timeout, BlockingIOError):
+        except (socket.timeout, BlockingIOError, ConnectionResetError):
             return None
         except Exception as e:
             print(f"Errore di ricezione UDP: {e}")
