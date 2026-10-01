@@ -22,7 +22,7 @@ def delayed_startup(node, is_starter):
             node.start_election()
     else:
         # Tutti i nodi che non sono coordinatori attendono e, se il nodo prescelto non ha avviato l'elezione iniziale, procedono loro stessi ad avviarla
-        time.sleep(22)
+        time.sleep(30)
         node.start_election()
 
 
